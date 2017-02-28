@@ -89,7 +89,7 @@ static void usage() {
            "  Time arguments may include a time unit (2s, 2m, 2h)     \n");
 }
 
-void gen_stats(uint64_t start) {
+void gen_stats(uint64_t start, bool last) {
     uint64_t complete = 0;
     uint64_t bytes    = 0;
     errors errors     = { 0 };
@@ -151,7 +151,12 @@ void gen_stats(uint64_t start) {
         if (hdr_log_encode(latency_histogram, &encoded)) {
             encoded = "";
         }
-        printf("\"hist\": \"%s\"\n}\n", encoded);
+        if (last) {
+            printf("\"hist\": \"%s\"\n}\n", encoded);
+        }
+        else {
+            printf("\"hist\": \"%s\"\n},\n", encoded);
+        }
         fflush(stdout);
         free(encoded);
     } else {
@@ -199,7 +204,7 @@ void gen_stats(uint64_t start) {
 }
 
 static int period_report_func(aeEventLoop *loop, long long id, void *data) {
-    gen_stats(last_report_time);
+    gen_stats(last_report_time, false);
     if (!cfg.json_encoding) {
         printf("=== REPORT END ===\n");
     }
@@ -329,6 +334,9 @@ int main(int argc, char **argv) {
     }
 
     if (cfg.report_interval) {
+        if (cfg.json_encoding) {
+            printf("[\n");
+        }
         if (pthread_create(&report_thread, NULL, &period_report, NULL)) {
             char *msg = strerror(errno);
             fprintf(stderr, "unable to create thread for reporting: %s\n", msg);
@@ -344,10 +352,13 @@ int main(int argc, char **argv) {
     if (cfg.report_interval) {
         aeStop(pr_loop);
         aeDeleteEventLoop(pr_loop);
-        gen_stats(last_report_time);
+        gen_stats(last_report_time, true);
+        if (cfg.json_encoding) {
+            printf("]\n");
+        }
     } else {
         // Accumulated reports
-        gen_stats(start_time);
+        gen_stats(start_time, true);
     }
     return 0;
 }
