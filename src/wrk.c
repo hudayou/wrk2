@@ -140,7 +140,7 @@ void gen_stats(uint64_t start, bool last) {
 
     if (cfg.json) {
         printf("{\n");
-        print_buckets_json(latency_histogram);
+        printf("\"latency\": %.2f,\n", hdr_mean(latency_histogram));
     }
 
     char *runtime_msg = format_time_us(runtime_us);
