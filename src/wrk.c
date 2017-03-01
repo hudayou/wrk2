@@ -88,7 +88,7 @@ static void usage() {
            "  Time arguments may include a time unit (2s, 2m, 2h)     \n");
 }
 
-void gen_stats(uint64_t start) {
+void gen_stats(uint64_t start, bool last) {
     uint64_t complete = 0;
     uint64_t bytes    = 0;
     errors errors     = { 0 };
@@ -185,7 +185,12 @@ void gen_stats(uint64_t start) {
         }
         printf("\"total_req\": %"PRIu64", \"rps\": %.2Lf, \"rx_bps\": \"%sB\"\n",
                complete, req_per_s, format_binary(bytes_per_s));
-        printf("}\n");
+        if (last) {
+            printf("}\n");
+        }
+        else {
+            printf("},\n");
+        }
     }
 
     lua_State *L = work_threads[0].L;
@@ -197,7 +202,7 @@ void gen_stats(uint64_t start) {
 }
 
 static int period_report_func(aeEventLoop *loop, long long id, void *data) {
-    gen_stats(last_report_time);
+    gen_stats(last_report_time, false);
     if (!cfg.json) {
         printf("=== REPORT END ===\n");
     }
@@ -359,6 +364,9 @@ int main(int argc, char **argv) {
     }
 
     if (cfg.report_interval) {
+        if (cfg.json) {
+            printf("[\n");
+        }
         if (pthread_create(&report_thread, NULL, &period_report, NULL)) {
             char *msg = strerror(errno);
             fprintf(stderr, "unable to create thread for reporting: %s\n", msg);
@@ -374,10 +382,13 @@ int main(int argc, char **argv) {
     if (cfg.report_interval) {
         aeStop(pr_loop);
         aeDeleteEventLoop(pr_loop);
-        gen_stats(last_report_time);
+        gen_stats(last_report_time, true);
+        if (cfg.json) {
+            printf("]\n");
+        }
     } else {
         // Accumulated reports
-        gen_stats(start_time);
+        gen_stats(start_time, true);
     }
     return 0;
 }
@@ -993,6 +1004,7 @@ static void print_buckets_json(struct hdr_histogram* histogram) {
     if (cfg.report_interval) {
         printf("\"seq\": %d,\n", seq++);
     }
+
     printf("\"latency\": {\n");
     printf("    \"min\": %"PRId64", \"max\": %"PRId64",\n",
            hdr_min(latency_histogram),
