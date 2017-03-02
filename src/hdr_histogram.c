@@ -371,6 +371,10 @@ double hdr_mean(struct hdr_histogram* h)
         }
     }
 
+    if (h->total_count == 0) {
+      return 0;
+    }
+
     return (total * 1.0) / h->total_count;
 }
 
